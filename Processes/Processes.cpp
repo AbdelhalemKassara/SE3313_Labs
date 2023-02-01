@@ -30,19 +30,21 @@ int main() {
 			print(processes);
 		}
 	}
-	
-	//for the child processes
-	while(id == 0) {
-		std::cout << getpid() << " : id, this is a child: "<< userData << std::endl;
-		sleep(1);//makes the child process sleep for 1 second
-	}
 
-	//for the parent process
-	if(id != 0) {
-		for(int i = 0; i < processes.size(); i++) {
-			std::cout << "kill : " << processes.at(i) << std::endl;
-			kill(processes.at(i), SIGKILL);//kills all child processes as well as the parent
+	//for the child processes
+	if(id == 0) {
+		std::ofstream MyFile(std::to_string(getpid()) + ".txt");
+
+		while(true) {
+			MyFile << userData << std::endl;
+			sleep(1);//makes the child process sleep for 1 second
 		}
+
+	}	else {	//for the parent process
+		for(int i = 0; i < processes.size(); i++) {
+				std::cout << "kill : " << processes.at(i) << std::endl;
+				kill(processes.at(i), SIGKILL);//kills all child processes as well as the parent
+			}
 	}
 
 	return 0;
