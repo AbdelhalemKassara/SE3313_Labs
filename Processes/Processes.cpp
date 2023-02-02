@@ -4,9 +4,6 @@
 #include <vector>
 #include <fstream>
 
-void print(std::vector<int> v);
-bool checkExists(std::vector<int> v, int id);
-
 int main() {
 	std::string userData;
 	std::vector<pid_t> processes;
@@ -15,10 +12,10 @@ int main() {
 	while (true) {
 		std::cout << "Please enter some text. parent: " << getpid() << std::endl;
 
-		std::cin >> userData;
+		std::getline(std::cin, userData);//takes in the whole string including spaces
 		std::cout << "'" << userData << "' was entered." << std::endl;
 
-		if(userData == "Done") {//breaks out of the loop when 'Done' is entered just before creating a new process.
+		if(userData == "Done" || userData == "done") {//breaks out of the loop when 'Done' is entered just before creating a new process.
 			break;
 		}
 
@@ -27,7 +24,6 @@ int main() {
 			break;
 		} else {
 			processes.push_back(id);
-			print(processes);
 		}
 	}
 
@@ -42,19 +38,10 @@ int main() {
 
 	}	else {	//for the parent process
 		for(int i = 0; i < processes.size(); i++) {
-				std::cout << "kill : " << processes.at(i) << std::endl;
 				kill(processes.at(i), SIGKILL);//kills all child processes as well as the parent
+				std::cout << "kill : " << processes.at(i) << std::endl;
 			}
 	}
 
 	return 0;
-}
-
-void print(std::vector<int> v) {
-	std::string output = "";
-	for(int d = 0; d < v.size(); d++) {
-		output += ", " + std::to_string(v.at(d));
-	}
-
-	std::cout << output << std::endl;
 }
