@@ -39,9 +39,7 @@ public:
 		{
 			sleep(delay);
 			this->reportNum++;
-			time_t curTime = time(0);
 
-			int timeElapsed = curTime - startTime;
 			sharedMem->reportNum = reportNum;
 			sharedMem->threadId = threadId;
 			sharedMem->delayT = delay;
