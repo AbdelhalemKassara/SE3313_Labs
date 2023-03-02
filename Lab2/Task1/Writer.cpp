@@ -1,110 +1,95 @@
-#include <iostream>
 #include "thread.h"
-#include "SharedObject.h"
-#include "Blockable.h"
-#include <time.h>
-#include <stack>
 #include <thread>
 #include <unistd.h>
+#include <iostream>
+#include "Blockable.h"
+#include <time.h>
+#include "SharedObject.h"
+#include <stack>
 
-
-struct MyShared{
-	int threadNum;
-	int reportID;
-	int timePassed;
-	int totalTime;
+struct MyShared
+{
+	int threadId;
+	int reportNum;
 	int delayT;
 };
 
-class WriterThread : public Thread{
-	public:
-		int threadNumber;
-		bool flag = false;	//false so that the loop doesn't break. 
-		int delay;
-		int reportID = 0;
-		//int totalTime;
-		
-		WriterThread(int in, int delayTime):Thread(delayTime*1000){
-			this->threadNumber = in; 
-			this->delay = delayTime;
-			
-			//alters property of a memory referenced object with -> notation
-			
+class WriterThread : public Thread
+{
+public:
+	int threadId;
+	bool continueLoop = true;
+	int delay;
+	int reportNum = 0;
+
+	WriterThread(int in, int delayTime) : Thread(delayTime * 1000)
+	{
+		this->threadId = in;
+		this->delay = delayTime;
+	}
+
+	virtual long ThreadMain(void) override
+	{
+
+		// declare shared memory var so this thread can access it
+		Shared<MyShared> sharedMem("origin");
+		time_t startTime = time(0);
+
+		while (continueLoop)
+		{
+			sleep(delay);
+			this->reportNum++;
+			time_t curTime = time(0);
+
+			int timeElapsed = curTime - startTime;
+			sharedMem->reportNum = reportNum;
+			sharedMem->threadId = threadId;
+			sharedMem->delayT = delay;
 		}
-
-		virtual long ThreadMain(void) override{
-			
-			//declare shared memory var so this thread can access it
-			Shared<MyShared> sharedMemory ("sharedMemory");
-			time_t firstTime = time(0);
-			
-			while(true)
-			{
-				this->reportID++; //increment report counter every cycle.
-				
-				sleep(delay); //sleep the thread for the specified delay
-				time_t lastTime = time(0);
-
-				int timeElapsed = lastTime - firstTime;
-				sharedMemory-> threadNum = threadNumber; //set the shared memory location to the thread ID we are currently on
-				sharedMemory-> timePassed = timeElapsed;
-				sharedMemory-> reportID = reportID;		//update all the stuff for our shared memory location. 
-				sharedMemory->totalTime = timeElapsed*reportID;
-				sharedMemory->delayT = delay;
-				if(flag){//Exit loop to end the thread
-					break;
-				}
-			}
 		return 1;
 	}
 };
 
-
-
-int main(void)
+int main()
 {
-	std::cout << "I am a Writer\n";
-	
-	Shared<MyShared> shared("sharedMemory", true); //This is the owner of sharedMamory
-	
-	int threadNumber = 0;
-	std::string delayTime;
-	std::string userInput;
-	
-	WriterThread * thread1; //we use this reference to create new threads in the while statement. 
-	std::stack<WriterThread*> threadStack; 	//an empty stack. We will store the threads in here. 
+	std::cout << "I am a Writer" << std::endl;
 
+	Shared<MyShared> shared("origin", true); // This is the owner of sharedMamory
 
-	while(true){
-		std::cout << "Do you want to create a new thread? (y/n)\n";
-		//create thread using user input
-		std::getline(std::cin, userInput);
-		
-		if (userInput == "n"){
-			break;	
+	int threadNum = 0;
+	std::stack<WriterThread *> threadsStack; // we will store the threads in this stack
+	WriterThread *thread;
+
+	std::string delayStr;
+	std::string newThreadStr;
+
+	while (true)
+	{
+		std::cout << "Would you like to create a writer thread? (y/n)" << std::endl;
+		std::getline(std::cin, newThreadStr);
+
+		if (newThreadStr == "y")
+		{
+			std::cout << "What is the delay time for this thread?" << std::endl;
+			std::getline(std::cin, delayStr);
+
+			threadNum++;
+			int delayInt = std::stoi(delayStr);
+			thread = new WriterThread(threadNum, delayInt);
+			threadsStack.push(thread);
 		}
-		else{
-			std::cout <<"What delay do u want on this thread? \n";
-			threadNumber++;
-			std::getline(std::cin, delayTime);
-			int delayInt = std::stoi(delayTime);
-			thread1 = new WriterThread(threadNumber, delayInt); //create a new writer thread with the thread number and the delay specified
-			threadStack.push(thread1);
-			
+		else if (newThreadStr == "n")
+		{
+			break;
 		}
 	}
-	//if we are no longer in the loop then we are done collecting and creating threads. Time to delete them. 
-	for(auto i = 0; i < threadStack.size(); i++){
-		//now we need to stop the thread. So we have to set the flag to true.
-		thread1 = threadStack.top();
-		thread1->flag = true;
-		delete thread1;	//delete the thread! 
-		threadStack.pop();	//pop the top thread. 
+
+	// we aren't creating threads anymore when we reach this point so we will delete them.
+	for (int i = 0; i < threadsStack.size(); i++)
+	{
+		thread = threadsStack.top();
+		thread->continueLoop = false;
+		delete thread;
+		threadsStack.pop();
 	}
 }
-
-
-
-
-
-
