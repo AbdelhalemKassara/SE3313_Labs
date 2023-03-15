@@ -14,12 +14,15 @@ using namespace Sync;
 
 class ClientThread : public Thread
 {
-    Socket &socket;
-
 public:
-    ClientThread(Socket &s) : socket(s)
+    Socket *socket;
+    bool *done = new bool(false);
+
+    ClientThread(Socket *socket)
     {
+        (*this).socket = socket;
     }
+    ~ClientThread() {}
 
     virtual long ThreadMain(void) override
     {
@@ -27,7 +30,7 @@ public:
         {
             ByteArray clientData;
 
-            socket.Read(clientData);
+            (*socket).Read(clientData);
             std::string clientString;
             clientString = clientData.ToString();
 
@@ -35,13 +38,18 @@ public:
 
             clientString = processString(clientString);
             ByteArray out(clientString);
-            socket.Write(out);
+            (*socket).Write(out);
         }
         catch (std::string error)
         {
             std::cout << error << std::endl;
         }
+        catch (std::string &error)
+        {
+            std::cout << error << std::endl;
+        }
 
+        *done = true;
         return 1; // thread ends here
     }
 
@@ -53,22 +61,33 @@ public:
     }
 };
 
-class ServerThread : public Thread
+// check if any threads have completed then delete them
+int deleteFinishedThreads(std::vector<ClientThread *> *threads)
 {
-};
+    for (int i = 0; i < (*threads).size(); i++)
+    {
+        if (*((*(*threads)[i]).done) == 1)
+        {
+            delete (*threads)[i];
+            (*threads).erase((*threads).begin() - i);
+        }
+    }
+
+    return (*threads).size();
+}
 
 int main(void)
 {
-    // std::stack<ClientThread *> threadsStack; // we will store the threads in this stack
-
     std::cout << "I am a server." << std::endl;
     SocketServer server(2000);
-    ClientThread *thread;
+    std::vector<ClientThread *> threads;
 
     while (true)
     {
-        std::cout << "loop" << std::endl;
         Socket *socket = new Socket(server.Accept()); // this waits until a user connects
-        thread = new ClientThread(*socket);
+
+        threads.push_back(new ClientThread(socket)); // create a new thread to process the user request
+
+        // deleteFinishedThreads(&threads);
     }
 }
