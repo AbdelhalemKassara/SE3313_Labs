@@ -7,8 +7,6 @@
 #include <stack>
 
 #include <bits/stdc++.h>
-#include <thread>
-// #include <socket.h>
 
 using namespace Sync;
 
@@ -16,41 +14,59 @@ class ClientThread : public Thread
 {
 public:
     Socket *socket;
-    bool *done = new bool(false);
+    bool *done = new bool(true);
 
-    ClientThread(Socket *socket)
+    ClientThread(Socket *socket) : Thread()
     {
+        *((*this).done) = false;
         (*this).socket = socket;
     }
-    ~ClientThread() {}
 
-    virtual long ThreadMain(void) override
+    ~ClientThread()
     {
+        std::cout << "deleted" << std::endl;
+        (*socket).Close(); // close the socket
+        delete socket;
+        delete done;
+    }
+
+    virtual long ThreadMain(void)
+    { // this needs to be in a while loop and only be closed when the client sends a signal or something for it close
         try
         {
-            ByteArray clientData;
+            while (!(*done))
+            {
+                // std::cout << done << std::endl;
 
-            (*socket).Read(clientData);
-            std::string clientString;
-            clientString = clientData.ToString();
+                ByteArray clientData;
 
-            std::cout << clientString << std::endl;
+                (*socket).Read(clientData);
+                std::string clientString;
+                clientString = clientData.ToString();
 
-            clientString = processString(clientString);
-            ByteArray out(clientString);
-            (*socket).Write(out);
+                if (clientString == "done")
+                {
+                    *done = true; // indicate that this thread has finished processing and ready to be deleted
+                }
+                else
+                {
+
+                    clientString = processString(clientString);
+                    ByteArray out(clientString);
+                    (*socket).Write(out);
+                }
+            }
         }
         catch (std::string error)
         {
             std::cout << error << std::endl;
         }
-        catch (std::string &error)
+        catch (TerminationException e)
         {
-            std::cout << error << std::endl;
+            std::cout << "Server has been terminated" << std::endl;
         }
 
-        *done = true;
-        return 1; // thread ends here
+        return 0; // thread ends here
     }
 
     // converts the input string to all upper case
@@ -64,16 +80,23 @@ public:
 // check if any threads have completed then delete them
 int deleteFinishedThreads(std::vector<ClientThread *> *threads)
 {
-    for (int i = 0; i < (*threads).size(); i++)
+    try
     {
-        if (*((*(*threads)[i]).done) == 1)
+        for (int i = 0; i < (*threads).size(); i++)
         {
-            delete (*threads)[i];
-            (*threads).erase((*threads).begin() - i);
+            if (*((*(*threads)[i]).done) == 1)
+            {
+                delete (*threads)[i];
+                (*threads).erase((*threads).begin() - i);
+            }
         }
-    }
 
-    return (*threads).size();
+        return (*threads).size();
+    }
+    catch (...)
+    {
+        std::cout << "something when wrong when cleaning up the finished threads" << std::endl;
+    }
 }
 
 int main(void)
@@ -84,10 +107,17 @@ int main(void)
 
     while (true)
     {
-        Socket *socket = new Socket(server.Accept()); // this waits until a user connects
-
-        threads.push_back(new ClientThread(socket)); // create a new thread to process the user request
-
-        // deleteFinishedThreads(&threads);
+        try
+        {
+            Socket *socket = new Socket(server.Accept()); // this waits until a user connects
+            threads.push_back(new ClientThread(socket));  // create a new thread to process the user request
+            // std::cout << deleteFinishedThreads(&threads) << std::endl; // this delete the threads that are done
+        }
+        catch (std::string s)
+        {
+            std::cout << s << std::endl;
+        }
     }
+    // deleteFinishedThreads(&threads);
+    server.Shutdown();
 }

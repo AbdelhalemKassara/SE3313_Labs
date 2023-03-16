@@ -3,47 +3,86 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "thread.h"
+
 using namespace Sync;
 
-std::string userDataStr;
+class ClientThread : Thread
+{
+private:
+	Socket *socket;
+	bool *done;
+
+public:
+	ClientThread(Socket *socket, bool *done)
+	{
+		(*this).socket = socket;
+		(*this).done = done;
+	}
+	~ClientThread() {}
+
+	virtual long ThreadMain()
+	{
+		while (true)
+		{
+			try
+			{
+				// get the user input
+				std::string userInputStr;
+				std::cout << "Enter some Text: ";
+				std::getline(std::cin, userInputStr);
+
+				ByteArray bArr(userInputStr);
+				(*socket).Write(bArr); // write data to the server
+
+				// if the user is done break out of the loop
+				if (userInputStr == "done")
+				{
+					break;
+				}
+
+				int conStatus = (*socket).Read(bArr); // waits until we get data back from the server
+
+				if (conStatus == 0) // There is no connection with the server
+				{
+					break;
+				}
+				else if (conStatus < 0) // there was an issue with the request, server side
+				{
+					std::cout << "There was an issue processing your request, connection status < 0" << std::endl;
+				}
+				else // prints out the processed string returned by the server
+				{
+					std::cout << "Response: " << bArr.ToString() << std::endl;
+				}
+			}
+			catch (std::string s)
+			{
+				std::cout << s << std::endl;
+			}
+		}
+		*done = true;
+
+		return 0;
+	}
+};
 
 int main(void)
 {
 	std::cout << "I am a client" << std::endl;
+	bool done = false;
+	Socket socket("127.0.0.1", 2000);
 
-	while (true)
+	ClientThread thread(&socket, &done); // passes in the address of done and socket
+
+	socket.Open();
+
+	while (!done)
 	{
-
-		std::cout << "Enter some Text: ";
-
-		std::getline(std::cin, userDataStr); // takes in the whole string including spaces
-		if (userDataStr == "done")
-		{
-			break;
-		}
-		Socket socket("127.0.0.1", 2000);
-		socket.Open();
-
-		ByteArray byteData(userDataStr);
-
-		socket.Write(byteData); // this waits until it gets data from the server
-
-		ByteArray returnVal;
-		int worked = socket.Read(returnVal);
-
-		if (worked > 0) // everything is fine
-		{
-			std::string print = returnVal.ToString();
-			std::cout << "Response: " << print << std::endl
-								<< std::endl;
-		}
-		else if (worked == 0) // the connection on the server closed
-		{
-		}
-		else // there was an issue
-		{
-		}
+		sleep(1); // while the program is not done wait 2ms (to not waste resources)
 	}
+
+	socket.Close();
 
 	return 1;
 }
