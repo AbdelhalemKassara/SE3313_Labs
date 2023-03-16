@@ -26,9 +26,6 @@ public:
     ~ClientThread()
     {
         std::cout << "deleted" << std::endl;
-        // this->terminationEvent.Wait();
-        // delete socket;
-        // delete done;
     }
 
     virtual long ThreadMain(void)
@@ -37,14 +34,13 @@ public:
         {
             while (!(*done))
             {
-                std::cout << "processing thread" << std::endl;
                 ByteArray clientData;
 
-                (*socket).Read(clientData);
+                int val = (*socket).Read(clientData);
                 std::string clientString;
                 clientString = clientData.ToString();
 
-                if (clientString == "done" || clientString == "")
+                if (clientString == "done" || clientString == "" || val <= 0)
                 {
                     (*threads).erase(std::remove((*threads).begin(), (*threads).end(), this), (*threads).end()); // gets rid of this thread from the list
                     *done = true;                                                                                // indicate that this thread has finished processing and ready to be deleted
@@ -63,10 +59,9 @@ public:
             std::cout << error << std::endl;
             return 0;
         }
-        catch (TerminationException e)
+        catch (std::string &error)
         {
-            std::cout << "Server has been terminated" << std::endl;
-            return e;
+            std::cout << error << std::endl;
         }
 
         return 0; // thread ends here
@@ -97,7 +92,6 @@ public:
     {
         try
         {
-            std::cout << threads.size() << std::endl;
             for (int i = 0; i < threads.size(); i++)
             {
                 (*(*threads[i]).socket).Close(); // close all the open sockets
@@ -107,6 +101,7 @@ public:
         {
             std::cout << "There was an issue with cleaning up the files" << std::endl; // catch errors
         }
+        *endProgram = true;
     }
     virtual long ThreadMain(void)
     {
@@ -114,18 +109,25 @@ public:
         {
             try
             {
-                Socket *socket = new Socket((*server).Accept());       // this waits until a user connects
+                if (*endProgram)
+                {
+                    break;
+                }
+                Socket temp = (*server).Accept();
+
+                Socket *socket = new Socket(temp);                     // this waits until a user connects
                 threads.push_back(new ClientThread(socket, &threads)); // create a new thread to process the user request
             }
             catch (std::string s)
             {
-                std::cout << s << std::endl;
+                // std::cout << s << std::endl;
             }
             catch (TerminationException e)
             {
                 std::cout << "Server has been terminated." << std::endl;
             }
         }
+        return 0;
     }
 };
 int main(void)
@@ -133,15 +135,13 @@ int main(void)
     std::cout << "I am a server." << std::endl;
     SocketServer server(2000);
     bool endProgram = false;
-    ReqThread *reqThread = new ReqThread(&server, endProgram);
+    ReqThread reqThread(&server, endProgram);
 
     FlexWait cinWaiter(1, stdin);
     cinWaiter.Wait();
     std::cin.get();
 
     endProgram = true;
-    // (*reqThread).closeThreads();
-
     server.Shutdown();
 
     std::cout << "Server has shutdown" << std::endl;
